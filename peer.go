@@ -59,7 +59,7 @@ func New(ctx context.Context, logger logger.Logger, config Config) (peer *Peer, 
 
 // Run runs console until it's either closed or it errors.
 func (peer *Peer) Run(ctx context.Context) error {
-	peer.Log.Debug("runes-forge running")
+	peer.Log.Debug("mempool running")
 
 	group, ctx := errgroup.WithContext(ctx)
 
@@ -72,7 +72,7 @@ func (peer *Peer) Run(ctx context.Context) error {
 
 // Close closes all the resources.
 func (peer *Peer) Close() error {
-	peer.Log.Debug("runes-forge closing")
+	peer.Log.Debug("mempool closing")
 	var errlist errs.Group
 
 	if peer.Console.Endpoint != nil {
@@ -80,7 +80,7 @@ func (peer *Peer) Close() error {
 	}
 
 	if err := errlist.Err(); err != nil {
-		peer.Log.Error("could not close runes-forge", err)
+		peer.Log.Error("could not close mempool", err)
 		return err
 	}
 

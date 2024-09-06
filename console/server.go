@@ -113,7 +113,6 @@ type ScanResult struct {
 
 // getUTXO is an endpoint for getting utxo by address.
 func (s *Server) getUTXO(w http.ResponseWriter, r *http.Request) {
-
 	params := mux.Vars(r)
 	address, ok := params["address"]
 	if !ok {
