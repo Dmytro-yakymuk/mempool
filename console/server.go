@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"net"
 	"net/http"
 	"os/exec"
@@ -17,12 +18,17 @@ import (
 
 	"mempool/console/common"
 	"mempool/internal/logger"
+	"mempool/internal/numbers"
 	"mempool/pkg/rate"
 )
 
 var (
 	// Error is an error class that indicates internal http server error.
 	Error = errs.Class("console web server error")
+)
+
+const (
+	BTCDecimal = 8
 )
 
 // Config contains configuration for console web server.
@@ -97,7 +103,7 @@ func NewServer(
 }
 
 type UTXO struct {
-	Txid         string  `json:"txid"`
+	TxID         string  `json:"txid"`
 	Vout         int     `json:"vout"`
 	ScriptPubKey string  `json:"scriptPubKey"`
 	Amount       float64 `json:"amount"`
@@ -105,10 +111,25 @@ type UTXO struct {
 }
 
 type ScanResult struct {
-	Success       bool    `json:"success"`
+	Success       bool
+	Height        int     `json:"height"`
 	SearchedItems int     `json:"searched_items"`
 	Unspents      []UTXO  `json:"unspents"`
 	TotalAmount   float64 `json:"total_amount"`
+}
+
+type MempoolResponse struct {
+	TxID   string `json:"txid"`
+	Vout   int    `json:"vout"`
+	Status Status `json:"status"`
+	Value  int    `json:"value"`
+}
+
+type Status struct {
+	Confirmed   bool   `json:"confirmed"`
+	BlockHeight int    `json:"block_height"`
+	BlockHash   string `json:"block_hash"`
+	BlockTime   int    `json:"block_time"`
 }
 
 // getUTXO is an endpoint for getting utxo by address.
@@ -134,7 +155,25 @@ func (s *Server) getUTXO(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(result); err != nil {
+	resp := make([]MempoolResponse, len(result.Unspents))
+	for i, v := range result.Unspents {
+		amountFloat := numbers.ExponentiationFloat(big.NewFloat(v.Amount), BTCDecimal)
+		amountInt, _ := amountFloat.Int(nil)
+
+		isConfirmed := result.Height-v.Height >= 6
+
+		resp[i] = MempoolResponse{
+			TxID: v.TxID,
+			Vout: v.Vout,
+			Status: Status{
+				Confirmed: isConfirmed,
+				BlockTime: 0,
+			},
+			Value: int(amountInt.Int64()),
+		}
+	}
+
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		common.NewErrResponse(http.StatusInternalServerError, Error.Wrap(err)).Serve(s.log, Error, w)
 		return
 	}
