@@ -27,7 +27,7 @@ var (
 
 // Config contains configuration for console web server.
 type Config struct {
-	Address string `env:"ADDRESS"`
+	Address string
 	Cors    struct {
 		AllowedForAllOrigins bool     `env:"ALLOWED_FOR_ALL_ORIGINS"`
 		AllowedOrigins       []string `env:"ALLOWED_ORIGINS" envSeparator:" "`
