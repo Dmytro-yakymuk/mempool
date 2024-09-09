@@ -159,7 +159,7 @@ func handleRuneBalanceRequest(w http.ResponseWriter, r *http.Request, conn *pgx.
 		return
 	}
 
-	var runeBalances []RuneBalance
+	var runeBalances []RuneBalance = make([]RuneBalance, 0, 10)
 
 	// handle rows
 	for rows.Next() {
