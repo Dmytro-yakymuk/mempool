@@ -88,6 +88,24 @@ func main() {
 
 	r := mux.NewRouter()
 	r.Use(loggingMiddleware)
+	r.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		dbStatus := "error"
+		if conn.IsAlive() {
+			dbStatus = "ok"
+		}
+
+		btcStatus := "error"
+
+		if err := checkBitcoinConnection(); err == nil {
+			btcStatus = "ok"
+		}
+
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status": "ok",
+			"db":     dbStatus,
+			"btc":    btcStatus,
+		})
+	})
 	r.HandleFunc("/api/v1/address/{address}/utxo", handleUTXORequest)
 	r.HandleFunc("/api/v2/address/{address}/rune-balance", func(w http.ResponseWriter, r *http.Request) {
 		handleRuneBalanceRequest(w, r, conn)
