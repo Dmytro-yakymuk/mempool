@@ -7,14 +7,17 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/gorilla/mux"
+	"github.com/jackc/pgx"
 )
 
 var (
 	host   string
 	port   int
 	btcrpc string
+	pgurl  string
 )
 
 type RPCRequest struct {
@@ -45,10 +48,20 @@ type UTXO struct {
 	Value int64 `json:"value"`
 }
 
+type RuneBalance struct {
+	Amount        int     `json:"amount"`
+	Divisibility  int     `json:"divisibility"`
+	Symbol        *string `json:"symbol"`
+	RuneName      string  `json:"runeName"`
+	InscriptionId string  `json:"inscriptionId"`
+	ID            string  `json:"id"`
+}
+
 func init() {
 	flag.StringVar(&host, "host", "0.0.0.0", "Host to listen on")
 	flag.IntVar(&port, "port", 12345, "Port to listen on")
-	flag.StringVar(&btcrpc, "btcrpc", "http://user:password@localhost:8332", "Bitcoin RPC URL")
+	flag.StringVar(&btcrpc, "btcrpc", "http://user:password@localhost:48000", "Bitcoin RPC URL")
+	flag.StringVar(&pgurl, "pgurl", "postgres://dev:dev@127.0.0.1:5432/runes_dex", "Postgres URL")
 }
 
 func main() {
@@ -58,12 +71,38 @@ func main() {
 		log.Fatalf("Failed to connect to Bitcoin node: %v", err)
 	}
 
+	conf, err := ParsePgConn(pgurl)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Unable to parse Postgres connection URL: %v\n", err)
+		os.Exit(1)
+	}
+
+	// open a connection to the database
+	conn, err := pgx.Connect(*conf)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
+		os.Exit(1)
+	}
+	log.Printf("Database connection OK")
+	defer conn.Close()
+
 	r := mux.NewRouter()
+	r.Use(loggingMiddleware)
 	r.HandleFunc("/api/v1/address/{address}/utxo", handleUTXORequest)
+	r.HandleFunc("/api/v2/address/{address}/rune-balance", func(w http.ResponseWriter, r *http.Request) {
+		handleRuneBalanceRequest(w, r, conn)
+	})
 
 	addr := fmt.Sprintf("%s:%d", host, port)
 	log.Printf("Server listening on %s", addr)
 	log.Fatal(http.ListenAndServe(addr, r))
+}
+
+func loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("%s %s %s", r.RemoteAddr, r.Method, r.URL)
+		next.ServeHTTP(w, r)
+	})
 }
 
 func checkBitcoinConnection() error {
@@ -87,6 +126,48 @@ func handleUTXORequest(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(utxos)
+}
+
+func handleRuneBalanceRequest(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
+	vars := mux.Vars(r)
+	address := vars["address"]
+
+	var tx_hash, rune, symbol string
+	var block, tx_id, output_n, divisibility, amount int
+	rows, err := conn.Query(`SELECT r.block, r.tx_id, r.tx_hash, r.output_n, r.rune, ru.divisibility, ru.symbol, r.amount
+		FROM runes_utxos r
+		JOIN runes ru ON r.rune = ru.rune
+		WHERE r.spend = false AND r.address = $1
+		ORDER BY r.amount DESC`, address)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var runeBalances []RuneBalance
+
+	// handle rows
+	for rows.Next() {
+		err := rows.Scan(&block, &tx_id, &tx_hash, &output_n, &rune, &divisibility, &symbol, &amount)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		runeBalance := RuneBalance{
+			ID:            fmt.Sprintf("%d:%d", block, tx_id),
+			Amount:        amount,
+			RuneName:      rune,
+			Divisibility:  divisibility,
+			Symbol:        &symbol,
+			InscriptionId: tx_hash,
+		}
+
+		runeBalances = append(runeBalances, runeBalance)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(runeBalances)
 }
 
 func getUTXOs(address string) ([]UTXO, error) {
