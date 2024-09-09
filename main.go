@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -149,11 +150,11 @@ func handleRuneBalanceRequest(w http.ResponseWriter, r *http.Request, conn *pgx.
 
 	var tx_hash, rune, symbol string
 	var block, tx_id, output_n, divisibility, amount int
-	rows, err := conn.Query(`SELECT r.block, r.tx_id, r.tx_hash, r.output_n, r.rune, ru.divisibility, ru.symbol, r.amount
+	rows, err := conn.QueryEx(context.Background(), `SELECT r.block, r.tx_id, r.tx_hash, r.output_n, r.rune, ru.divisibility, ru.symbol, r.amount
 		FROM runes_utxos r
 		JOIN runes ru ON r.rune = ru.rune
 		WHERE r.spend = false AND r.address = $1
-		ORDER BY r.amount DESC`, address)
+		ORDER BY r.amount DESC`, &pgx.QueryExOptions{}, address)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
