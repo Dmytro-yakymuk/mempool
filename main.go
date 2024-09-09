@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx"
@@ -70,18 +69,17 @@ func main() {
 	if err := checkBitcoinConnection(); err != nil {
 		log.Fatalf("Failed to connect to Bitcoin node: %v", err)
 	}
+	log.Println("Successfully connected to Bitcoin node")
 
 	conf, err := ParsePgConn(pgurl)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to parse Postgres connection URL: %v\n", err)
-		os.Exit(1)
+		log.Fatalf("Unable to parse Postgres connection URL: %v\n", err)
 	}
 
 	// open a connection to the database
 	conn, err := pgx.Connect(*conf)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
-		os.Exit(1)
+		log.Fatalf("Unable to connect to database: %v\n", err)
 	}
 	log.Printf("Database connection OK")
 	defer conn.Close()
@@ -95,13 +93,11 @@ func main() {
 		}
 
 		btcStatus := "error"
-
 		if err := checkBitcoinConnection(); err == nil {
 			btcStatus = "ok"
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"status": "ok",
 			"db":     dbStatus,
@@ -130,7 +126,6 @@ func checkBitcoinConnection() error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to Bitcoin node: %v", err)
 	}
-	log.Println("Successfully connected to Bitcoin node")
 	return nil
 }
 
