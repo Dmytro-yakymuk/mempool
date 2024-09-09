@@ -105,7 +105,7 @@ func main() {
 		})
 	})
 	r.HandleFunc("/api/v1/address/{address}/utxo", handleUTXORequest)
-	r.HandleFunc("/api/v2/address/{address}/rune-balance", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/v2/address/{address}/rune-balance", func(w http.ResponseWriter, r *http.Request) {
 		handleRuneBalanceRequest(w, r, conn)
 	})
 
