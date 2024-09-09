@@ -149,12 +149,13 @@ func handleRuneBalanceRequest(w http.ResponseWriter, r *http.Request, conn *pgx.
 	address := vars["address"]
 
 	var tx_hash, rune, symbol string
-	var block, tx_id, output_n, divisibility, amount int
-	rows, err := conn.QueryEx(context.Background(), `SELECT r.block, r.tx_id, r.tx_hash, r.output_n, r.rune, ru.divisibility, ru.symbol, r.amount
+	var block, tx_id, divisibility, amount int
+	rows, err := conn.QueryEx(context.Background(), `SELECT r.rune, ru.divisibility, ru.symbol, ru.block, ru.tx_id, SUM(r.amount) AS amount
 		FROM runes_utxos r
 		JOIN runes ru ON r.rune = ru.rune
 		WHERE r.spend = false AND r.address = $1
-		ORDER BY r.amount DESC`, &pgx.QueryExOptions{}, address)
+		GROUP BY r.rune, ru.divisibility, ru.symbol, ru.block, ru.tx_id
+		ORDER BY amount DESC`, &pgx.QueryExOptions{}, address)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -164,7 +165,7 @@ func handleRuneBalanceRequest(w http.ResponseWriter, r *http.Request, conn *pgx.
 
 	// handle rows
 	for rows.Next() {
-		err := rows.Scan(&block, &tx_id, &tx_hash, &output_n, &rune, &divisibility, &symbol, &amount)
+		err := rows.Scan(&rune, &divisibility, &symbol, &block, &tx_id, &amount)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
