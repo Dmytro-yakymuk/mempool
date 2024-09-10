@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -107,7 +106,11 @@ func main() {
 	})
 	r.HandleFunc("/api/v1/address/{address}/utxo", handleUTXORequest)
 	r.HandleFunc("/v2/address/{address}/rune-balance", func(w http.ResponseWriter, r *http.Request) {
-		handleRuneBalanceRequest(w, r, conn)
+		HandleRuneBalanceRequest(w, r, conn)
+	})
+
+	r.HandleFunc("/v1/address/{address}/rune/{rune}", func(w http.ResponseWriter, r *http.Request) {
+		HandleGetRuneTransactions(w, r, conn)
 	})
 
 	addr := fmt.Sprintf("%s:%d", host, port)
@@ -142,49 +145,6 @@ func handleUTXORequest(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(utxos)
-}
-
-func handleRuneBalanceRequest(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
-	vars := mux.Vars(r)
-	address := vars["address"]
-
-	var tx_hash, rune, symbol string
-	var block, tx_id, divisibility, amount int
-	rows, err := conn.QueryEx(context.Background(), `SELECT r.rune, ru.divisibility, ru.symbol, ru.block, ru.tx_id, SUM(r.amount) AS amount
-		FROM runes_utxos r
-		JOIN runes ru ON r.rune = ru.rune
-		WHERE r.spend = false AND r.address = $1
-		GROUP BY r.rune, ru.divisibility, ru.symbol, ru.block, ru.tx_id
-		ORDER BY amount DESC`, &pgx.QueryExOptions{}, address)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	var runeBalances []RuneBalance = make([]RuneBalance, 0, 10)
-
-	// handle rows
-	for rows.Next() {
-		err := rows.Scan(&rune, &divisibility, &symbol, &block, &tx_id, &amount)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		runeBalance := RuneBalance{
-			ID:            fmt.Sprintf("%d:%d", block, tx_id),
-			Amount:        amount,
-			RuneName:      rune,
-			Divisibility:  divisibility,
-			Symbol:        &symbol,
-			InscriptionId: tx_hash,
-		}
-
-		runeBalances = append(runeBalances, runeBalance)
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(runeBalances)
 }
 
 func getUTXOs(address string) ([]UTXO, error) {
