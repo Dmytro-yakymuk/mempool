@@ -74,7 +74,7 @@ func HandleGetRuneTransactions(w http.ResponseWriter, r *http.Request, conn *pgx
 	}
 
 	rows, err := conn.QueryEx(context.Background(),
-		`SELECT runes_utxos.amount, runes_utxos.tx_hash as txid, runes_utxos.block as blockHeight
+		`SELECT runes_utxos.amount, runes_utxos.tx_hash as txid, runes_utxos.block as blockHeight, runes_utxos.spend
 		FROM runes
 		JOIN runes_utxos ON runes.rune = runes_utxos.rune
 		WHERE runes_utxos.address = $1 AND runes_utxos.rune = $2
@@ -94,9 +94,10 @@ func HandleGetRuneTransactions(w http.ResponseWriter, r *http.Request, conn *pgx
 
 	// handle rows
 	for rows.Next() {
+		var spend bool
 		var txid string
 		var amount, blockHeight int
-		err := rows.Scan(&amount, &txid, &blockHeight)
+		err := rows.Scan(&amount, &txid, &blockHeight, &spend)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -106,8 +107,8 @@ func HandleGetRuneTransactions(w http.ResponseWriter, r *http.Request, conn *pgx
 			TxID:           txid,
 			Amount:         amount,
 			BlockHeight:    blockHeight,
-			BlockTimestamp: "",
-			Burned:         false,
+			BlockTimestamp: "2024-09-09T09:27:26.000Z",
+			Burned:         spend,
 		})
 	}
 
