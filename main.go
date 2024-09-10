@@ -109,9 +109,9 @@ func main() {
 		HandleRuneBalanceRequest(w, r, conn)
 	})
 
-	r.HandleFunc("/v1/address/{address}/rune/{rune}", func(w http.ResponseWriter, r *http.Request) {
-		HandleGetRuneTransactions(w, r, conn)
-	})
+	// r.HandleFunc("/v1/address/{address}/rune/{rune}", func(w http.ResponseWriter, r *http.Request) {
+	// 	HandleGetRuneTransactions(w, r, conn)
+	// })
 
 	addr := fmt.Sprintf("%s:%d", host, port)
 	log.Printf("Server listening on %s", addr)

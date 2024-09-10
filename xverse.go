@@ -12,11 +12,11 @@ import (
 )
 
 type RuneTransaction struct {
-	TxID           string `json:"txid"`
-	Amount         string `json:"amount"`
-	BlockHeight    int    `json:"blockHeight"`
-	BlockTimestamp string `json:"blockTimestamp"`
-	Burned         bool   `json:"burned"`
+	TxID           string  `json:"txid"`
+	Amount         string  `json:"amount"`
+	BlockHeight    int     `json:"blockHeight"`
+	BlockTimestamp *string `json:"blockTimestamp"`
+	Burned         bool    `json:"burned"`
 }
 
 type RuneResponse struct {
@@ -61,6 +61,19 @@ func HandleGetRuneTransactions(w http.ResponseWriter, r *http.Request, conn *pgx
 		limit = 50
 	}
 
+	// Get Rune info
+	var runeName string
+	var divisibility int
+	err = conn.QueryRow(
+		`SELECT symbol, divisibility
+		FROM runes
+		WHERE rune = $1`,
+		rune).Scan(&runeName, &divisibility)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	// Get total count
 	var total int
 	err = conn.QueryRow(
@@ -91,6 +104,8 @@ func HandleGetRuneTransactions(w http.ResponseWriter, r *http.Request, conn *pgx
 	runeResponse.Total = total
 	runeResponse.Offset = offset
 	runeResponse.Limit = limit
+	runeResponse.RuneName = runeName
+	runeResponse.Divisibility = divisibility
 
 	// handle rows
 	for rows.Next() {
@@ -107,7 +122,7 @@ func HandleGetRuneTransactions(w http.ResponseWriter, r *http.Request, conn *pgx
 			TxID:           txid,
 			Amount:         strconv.Itoa(amount),
 			BlockHeight:    blockHeight,
-			BlockTimestamp: "2024-09-09T09:27:26.000Z",
+			BlockTimestamp: nil,
 			Burned:         false,
 		})
 	}
