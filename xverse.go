@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"net/http"
 	"strconv"
 
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx"
+	"github.com/jackc/pgx/pgtype"
 )
 
 type RuneTransaction struct {
@@ -137,12 +139,14 @@ func HandleRuneBalanceRequest(w http.ResponseWriter, r *http.Request, conn *pgx.
 	address := vars["address"]
 
 	var tx_hash, rune, symbol string
-	var block, tx_id, divisibility, amount int
-	rows, err := conn.QueryEx(context.Background(), `SELECT r.rune, ru.divisibility, ru.symbol, ru.block, ru.tx_id, SUM(r.amount) AS amount
+	var block, tx_id, divisibility int
+	var amountPg pgtype.Numeric
+
+	rows, err := conn.QueryEx(context.Background(), `SELECT r.rune, ru.divisibility, ru.symbol, ru.block, ru.tx_id, r.tx_hash, SUM(r.amount) AS amount
 		FROM runes_utxos r
 		JOIN runes ru ON r.rune = ru.rune
 		WHERE r.spend = false AND r.address = $1
-		GROUP BY r.rune, ru.divisibility, ru.symbol, ru.block, ru.tx_id
+		GROUP BY r.rune, ru.divisibility, ru.symbol, ru.block, ru.tx_id, r.tx_hash
 		ORDER BY amount DESC`, &pgx.QueryExOptions{}, address)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -153,11 +157,25 @@ func HandleRuneBalanceRequest(w http.ResponseWriter, r *http.Request, conn *pgx.
 
 	// handle rows
 	for rows.Next() {
-		err := rows.Scan(&rune, &divisibility, &symbol, &block, &tx_id, &amount)
+		err := rows.Scan(&rune, &divisibility, &symbol, &block, &tx_id, &tx_hash, &amountPg)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		if amountPg.Status != pgtype.Present {
+			http.Error(w, "Amount is not present", http.StatusInternalServerError)
+			return
+		}
+
+		var amount big.Int
+		value, err := amountPg.Value()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		amount.SetString(value.(string), 16)
 
 		runeBalance := RuneBalance{
 			ID:            fmt.Sprintf("%d:%d", block, tx_id),

@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math/big"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -48,7 +49,7 @@ type UTXO struct {
 }
 
 type RuneBalance struct {
-	Amount        int     `json:"amount"`
+	Amount        big.Int `json:"amount"`
 	Divisibility  int     `json:"divisibility"`
 	Symbol        *string `json:"symbol"`
 	RuneName      string  `json:"runeName"`
