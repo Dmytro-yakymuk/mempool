@@ -13,7 +13,7 @@ import (
 
 type RuneTransaction struct {
 	TxID           string `json:"txid"`
-	Amount         int    `json:"amount"`
+	Amount         string `json:"amount"`
 	BlockHeight    int    `json:"blockHeight"`
 	BlockTimestamp string `json:"blockTimestamp"`
 	Burned         bool   `json:"burned"`
@@ -105,7 +105,7 @@ func HandleGetRuneTransactions(w http.ResponseWriter, r *http.Request, conn *pgx
 
 		runeResponse.Items = append(runeResponse.Items, RuneTransaction{
 			TxID:           txid,
-			Amount:         amount,
+			Amount:         strconv.Itoa(amount),
 			BlockHeight:    blockHeight,
 			BlockTimestamp: "2024-09-09T09:27:26.000Z",
 			Burned:         spend,
