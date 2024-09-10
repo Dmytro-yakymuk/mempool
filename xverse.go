@@ -108,7 +108,7 @@ func HandleGetRuneTransactions(w http.ResponseWriter, r *http.Request, conn *pgx
 			Amount:         strconv.Itoa(amount),
 			BlockHeight:    blockHeight,
 			BlockTimestamp: "2024-09-09T09:27:26.000Z",
-			Burned:         spend,
+			Burned:         false,
 		})
 	}
 
