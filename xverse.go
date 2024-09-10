@@ -113,13 +113,8 @@ func HandleGetRuneTransactions(w http.ResponseWriter, r *http.Request, conn *pgx
 	}
 
 	// Response
-	responseBytes, err := json.Marshal(runeResponse)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseBytes)
+	json.NewEncoder(w).Encode(runeResponse)
 }
 
 func HandleRuneBalanceRequest(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
